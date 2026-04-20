@@ -3,68 +3,46 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>아주대 마커 기록 앱</title>
+    <title>내 위치 기록 앱</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
         #map { width: 100%; height: 100%; }
 
         /* 우측 하단 추가 버튼 */
         .add-btn {
-            position: absolute;
-            bottom: 30px;
-            right: 30px;
-            width: 60px;
-            height: 60px;
-            background-color: #3399ff;
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 30px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            cursor: pointer;
-            z-index: 10;
+            position: absolute; bottom: 30px; right: 30px; width: 60px; height: 60px;
+            background-color: #3399ff; color: white; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            cursor: pointer; z-index: 10;
         }
 
         /* 입력 모달창 */
         #modal {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            max-width: 300px;
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.2);
-            z-index: 20;
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 85%; max-width: 320px; background: white; padding: 20px;
+            border-radius: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.2); z-index: 20;
         }
-        #modal input, #modal textarea { width: 100%; margin-bottom: 10px; box-sizing: border-box; padding: 8px; }
-        #modal button { width: 100%; padding: 10px; background: #3399ff; color: white; border: none; border-radius: 5px; }
+        #modal h4 { margin-top: 0; }
+        #modal input, #modal textarea { width: 100%; margin-bottom: 10px; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        #modal button { width: 100%; padding: 12px; background: #3399ff; color: white; border: none; border-radius: 5px; font-weight: bold; }
 
-        /* 마커 클릭 시 나타날 창 스타일 */
-        .wrap {padding: 5px;}
-        .info {border: 1px solid #ccc; border-radius: 5px; background: #fff; width: 200px;}
-        .info .title {padding: 5px; background: #eee; font-weight: bold;}
-        .info .body {padding: 5px; font-size: 12px;}
-        .info img {width: 100%; height: auto; display: block; margin-bottom: 5px;}
+        /* 인포윈도우 스타일 */
+        .info-box { padding: 10px; width: 200px; }
+        .info-box img { width: 100%; border-radius: 5px; margin-bottom: 5px; }
+        .info-box p { margin: 0; font-size: 13px; color: #333; word-break: break-all; }
     </style>
 </head>
 <body>
 
     <div id="map"></div>
-
     <div class="add-btn" onclick="openModal()">+</div>
 
     <div id="modal">
-        <h4>새 마커 등록</h4>
-        <input type="text" id="imgUrl" placeholder="사진 이미지 주소(URL)">
-        <textarea id="memo" placeholder="내용을 입력하세요" rows="3"></textarea>
-        <p style="font-size: 11px; color: gray;">* 지도의 중심에 마커가 생성됩니다.</p>
-        <button onclick="saveMarker()">마커 추가하기</button>
+        <h4>📸 현재 위치 기록</h4>
+        <input type="file" id="imageInput" accept="image/*">
+        <textarea id="memo" placeholder="지금 이 장소의 기록을 남겨보세요" rows="3"></textarea>
+        <button onclick="saveMarker()">기록하기</button>
         <button onclick="closeModal()" style="background:#ccc; margin-top:5px;">취소</button>
     </div>
 
@@ -72,45 +50,81 @@
 
     <script>
         var map;
-        var markers = [];
+        var userLat, userLng; // 현위치 저장 변수
+        var locMarker; // 현위치 표시 마커
 
         window.onload = function() {
             var container = document.getElementById('map');
             var options = {
-                center: new kakao.maps.LatLng(37.2831, 127.0448),
+                center: new kakao.maps.LatLng(37.2831, 127.0448), // 초기값은 아주대
                 level: 3
             };
             map = new kakao.maps.Map(container, options);
 
-            // 기존 저장된 데이터 불러오기
+            // 1. 현위치 추적 시작
+            startTracking();
+            // 저장된 데이터 불러오기
             loadMarkers();
         };
+
+        // GPS로 현위치 가져오기
+        function startTracking() {
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(function(position) {
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+                    var locPosition = new kakao.maps.LatLng(userLat, userLng);
+
+                    displayMyLocation(locPosition);
+                });
+            } else {
+                alert("이 브라우저에서는 GPS를 사용할 수 없습니다.");
+            }
+        }
+
+        // 현위치 마커 표시 (파란색 원 등 구분 필요시 커스텀 가능)
+        function displayMyLocation(locPosition) {
+            if (!locMarker) {
+                locMarker = new kakao.maps.Marker({ map: map, position: locPosition });
+                map.setCenter(locPosition);
+            } else {
+                locMarker.setPosition(locPosition);
+            }
+        }
 
         function openModal() { document.getElementById('modal').style.display = 'block'; }
         function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
+        // 사진 파일 읽기 및 마커 저장
         function saveMarker() {
-            var imgUrl = document.getElementById('imgUrl').value || 'https://via.placeholder.com/150';
+            var fileInput = document.getElementById('imageInput');
             var memo = document.getElementById('memo').value;
-            var center = map.getCenter(); // 지도의 중심 좌표에 생성
 
-            var markerData = {
-                lat: center.getLat(),
-                lng: center.getLng(),
-                img: imgUrl,
-                text: memo
-            };
+            if (!userLat || !userLng) {
+                alert("아직 위치 정보를 가져오지 못했습니다.");
+                return;
+            }
 
-            createMarker(markerData);
-            
-            // 로컬스토리지 저장
-            var saved = JSON.parse(localStorage.getItem('myMarkers') || '[]');
-            saved.push(markerData);
-            localStorage.setItem('myMarkers', JSON.stringify(saved));
+            if (fileInput.files && fileInput.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var imageData = e.target.result; // Base64 인코딩된 이미지 데이터
+                    
+                    var markerData = {
+                        lat: userLat,
+                        lng: userLng,
+                        img: imageData,
+                        text: memo
+                    };
 
-            closeModal();
-            document.getElementById('imgUrl').value = '';
-            document.getElementById('memo').value = '';
+                    createMarker(markerData);
+                    saveToLocal(markerData);
+                    closeModal();
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                alert("사진을 업로드해주세요.");
+            }
         }
 
         function createMarker(data) {
@@ -119,33 +133,31 @@
                 map: map
             });
 
-            // 마커 클릭 시 보여줄 인포윈도우 내용
             var content = `
-                <div class="wrap">
-                    <div class="info">
-                        <div class="title">기록</div>
-                        <div class="body">
-                            <img src="${data.img}">
-                            <div>${data.text}</div>
-                        </div>
-                    </div>
+                <div class="info-box">
+                    <img src="${data.img}">
+                    <p>${data.text}</p>
                 </div>`;
 
-            var infowindow = new kakao.maps.InfoWindow({
-                content: content,
-                removable: true
-            });
-
+            var infowindow = new kakao.maps.InfoWindow({ content: content, removable: true });
             kakao.maps.event.addListener(marker, 'click', function() {
                 infowindow.open(map, marker);
             });
         }
 
+        function saveToLocal(data) {
+            var saved = JSON.parse(localStorage.getItem('myMarkers') || '[]');
+            saved.push(data);
+            try {
+                localStorage.setItem('myMarkers', JSON.stringify(saved));
+            } catch (e) {
+                alert("저장 공간이 부족합니다. 사진 용량이 너무 클 수 있습니다.");
+            }
+        }
+
         function loadMarkers() {
             var saved = JSON.parse(localStorage.getItem('myMarkers') || '[]');
-            saved.forEach(function(data) {
-                createMarker(data);
-            });
+            saved.forEach(function(data) { createMarker(data); });
         }
     </script>
 </body>
