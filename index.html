@@ -1,41 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8"/>
-    <title>카카오 지도 해결</title>
-    <style>
-        #map { width: 100%; height: 500px; border: 1px solid #ccc; }
-        body { padding: 20px; }
-    </style>
+	<meta charset="utf-8"/>
+	<title>Kakao 지도 시작하기</title>
 </head>
 <body>
-    <h3>📍 과제용 지도 테스트</h3>
-    <div id="map"></div>
+	<div id="map" style="width:500px;height:400px;"></div>
+	<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=75fcb2d4c1736608787e9ddc72170aad"></script>
+	<script>
+		var container = document.getElementById('map');
+		var options = {
+			center: new kakao.maps.LatLng(33.450701, 126.570667),
+			level: 3
+		};
 
-    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=75fcb2d4c1736608787e9ddc72170aad"></script>
-
-    <script>
-        // 2. 페이지의 모든 요소(지도 SDK 포함)가 로드된 후 실행되도록 합니다.
-        window.onload = function() {
-            var container = document.getElementById('map');
-            var options = {
-                center: new kakao.maps.LatLng(37.2831, 127.0448), // 아주대학교 좌표
-                level: 3
-            };
-
-            // 3. kakao 객체가 있는지 최종 확인 후 생성
-            if (typeof kakao !== 'undefined' && kakao.maps) {
-                var map = new kakao.maps.Map(container, options);
-                
-                // 마커 추가
-                var marker = new kakao.maps.Marker({
-                    position: new kakao.maps.LatLng(37.2831, 127.0448)
-                });
-                marker.setMap(map);
-            } else {
-                alert("지도 라이브러리를 불러오지 못했습니다. API 키나 인터넷 연결을 확인하세요.");
-            }
-        };
-    </script>
+		var map = new kakao.maps.Map(container, options);
+	</script>
 </body>
 </html>
