@@ -2,40 +2,151 @@
 <html>
 <head>
     <meta charset="utf-8"/>
-    <title>과제용 지도 앱</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>아주대 마커 기록 앱</title>
     <style>
-        #map { width: 100%; height: 500px; border: 1px solid #ccc; }
-        body { padding: 20px; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        #map { width: 100%; height: 100%; }
+
+        /* 우측 하단 추가 버튼 */
+        .add-btn {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background-color: #3399ff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        /* 입력 모달창 */
+        #modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 300px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            z-index: 20;
+        }
+        #modal input, #modal textarea { width: 100%; margin-bottom: 10px; box-sizing: border-box; padding: 8px; }
+        #modal button { width: 100%; padding: 10px; background: #3399ff; color: white; border: none; border-radius: 5px; }
+
+        /* 마커 클릭 시 나타날 창 스타일 */
+        .wrap {padding: 5px;}
+        .info {border: 1px solid #ccc; border-radius: 5px; background: #fff; width: 200px;}
+        .info .title {padding: 5px; background: #eee; font-weight: bold;}
+        .info .body {padding: 5px; font-size: 12px;}
+        .info img {width: 100%; height: auto; display: block; margin-bottom: 5px;}
     </style>
 </head>
 <body>
-    <h3>📍 아주대학교 테스트 지도</h3>
+
     <div id="map"></div>
+
+    <div class="add-btn" onclick="openModal()">+</div>
+
+    <div id="modal">
+        <h4>새 마커 등록</h4>
+        <input type="text" id="imgUrl" placeholder="사진 이미지 주소(URL)">
+        <textarea id="memo" placeholder="내용을 입력하세요" rows="3"></textarea>
+        <p style="font-size: 11px; color: gray;">* 지도의 중심에 마커가 생성됩니다.</p>
+        <button onclick="saveMarker()">마커 추가하기</button>
+        <button onclick="closeModal()" style="background:#ccc; margin-top:5px;">취소</button>
+    </div>
 
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=75fcb2d4c1736608787e9ddc72170aad"></script>
 
     <script>
-        // 2. 브라우저가 모든 리소스를 다 읽은 후 실행되도록 설정
+        var map;
+        var markers = [];
+
         window.onload = function() {
-            // kakao 객체가 로드되었는지 최종 확인
-            if (window.kakao && window.kakao.maps) {
-                var container = document.getElementById('map');
-                var options = {
-                    center: new kakao.maps.LatLng(37.2831, 127.0448), // 아주대 정문
-                    level: 3
-                };
+            var container = document.getElementById('map');
+            var options = {
+                center: new kakao.maps.LatLng(37.2831, 127.0448),
+                level: 3
+            };
+            map = new kakao.maps.Map(container, options);
 
-                var map = new kakao.maps.Map(container, options);
-
-                // 마커 추가
-                var marker = new kakao.maps.Marker({
-                    position: new kakao.maps.LatLng(37.2831, 127.0448)
-                });
-                marker.setMap(map);
-            } else {
-                console.error("카카오 지도 SDK가 로드되지 않았습니다.");
-            }
+            // 기존 저장된 데이터 불러오기
+            loadMarkers();
         };
+
+        function openModal() { document.getElementById('modal').style.display = 'block'; }
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+        function saveMarker() {
+            var imgUrl = document.getElementById('imgUrl').value || 'https://via.placeholder.com/150';
+            var memo = document.getElementById('memo').value;
+            var center = map.getCenter(); // 지도의 중심 좌표에 생성
+
+            var markerData = {
+                lat: center.getLat(),
+                lng: center.getLng(),
+                img: imgUrl,
+                text: memo
+            };
+
+            createMarker(markerData);
+            
+            // 로컬스토리지 저장
+            var saved = JSON.parse(localStorage.getItem('myMarkers') || '[]');
+            saved.push(markerData);
+            localStorage.setItem('myMarkers', JSON.stringify(saved));
+
+            closeModal();
+            document.getElementById('imgUrl').value = '';
+            document.getElementById('memo').value = '';
+        }
+
+        function createMarker(data) {
+            var marker = new kakao.maps.Marker({
+                position: new kakao.maps.LatLng(data.lat, data.lng),
+                map: map
+            });
+
+            // 마커 클릭 시 보여줄 인포윈도우 내용
+            var content = `
+                <div class="wrap">
+                    <div class="info">
+                        <div class="title">기록</div>
+                        <div class="body">
+                            <img src="${data.img}">
+                            <div>${data.text}</div>
+                        </div>
+                    </div>
+                </div>`;
+
+            var infowindow = new kakao.maps.InfoWindow({
+                content: content,
+                removable: true
+            });
+
+            kakao.maps.event.addListener(marker, 'click', function() {
+                infowindow.open(map, marker);
+            });
+        }
+
+        function loadMarkers() {
+            var saved = JSON.parse(localStorage.getItem('myMarkers') || '[]');
+            saved.forEach(function(data) {
+                createMarker(data);
+            });
+        }
     </script>
 </body>
 </html>
