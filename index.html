@@ -1,20 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<meta charset="utf-8"/>
-	<title>Kakao 지도 시작하기</title>
+    <meta charset="utf-8"/>
+    <title>과제용 지도 테스트</title>
+    <style>
+        /* 지도가 보이지 않는 문제를 방지하기 위한 필수 CSS */
+        #map {
+            width: 100%;
+            height: 100vh; /* 화면 전체 높이로 설정 */
+            background-color: #eee; /* 로딩 전 회색 배경 표시 */
+        }
+        body { margin: 0; padding: 0; }
+    </style>
 </head>
 <body>
-	<div id="map" style="width:500px;height:400px;"></div>
-	<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=75fcb2d4c1736608787e9ddc72170aad"></script>
-	<script>
-		var container = document.getElementById('map');
-		var options = {
-			center: new kakao.maps.LatLng(33.450701, 126.570667),
-			level: 3
-		};
+    <div id="map"></div>
 
-		var map = new kakao.maps.Map(container, options);
-	</script>
+    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=75fcb2d4c1736608787e9ddc72170aad&autoload=false"></script>
+    
+    <script>
+        // 카카오 지도 라이브러리가 완전히 로드된 후 실행
+        kakao.maps.load(function() {
+            var container = document.getElementById('map');
+            var options = {
+                center: new kakao.maps.LatLng(37.2831, 127.0448), // 아주대학교 정문
+                level: 3
+            };
+
+            var map = new kakao.maps.Map(container, options);
+
+            // 마커 추가
+            var markerPosition  = new kakao.maps.LatLng(37.2831, 127.0448); 
+            var marker = new kakao.maps.Marker({
+                position: markerPosition
+            });
+            marker.setMap(map);
+            
+            console.log("지도 로드 완료!");
+        });
+    </script>
 </body>
 </html>
