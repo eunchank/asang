@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>보행자 지도</title>
+  <title>보행자 지도1</title>
 
   <style>
     body {
@@ -20,10 +20,7 @@
       width: 60px;
       height: 60px;
 
-      background-image: url("icon/loc_icon.png");
-      background-size: contain;
-      background-repeat: no-repeat;
-      background-position: center;
+      background: url("icon/loc_icon.png") center / contain no-repeat;
 
       transform-origin: center center;
     }
@@ -38,24 +35,25 @@
 <script>
 
   const map = new kakao.maps.Map(
-    document.getElementById('map'),
+    document.getElementById("map"),
     {
       center: new kakao.maps.LatLng(37.5665, 126.9780),
       level: 2
     }
   );
 
-  let heading = 0;
-
   // 현재 위치
-  let currentPosition = new kakao.maps.LatLng(37.5665, 126.9780);
+  let currentPosition =
+    new kakao.maps.LatLng(37.5665, 126.9780);
 
-  // 마커 한번만 생성
+  // 방향값
+  let targetHeading = 0;
+  let currentHeading = 0;
+
+  // 사용자 마커
   const overlay = new kakao.maps.CustomOverlay({
     position: currentPosition,
-    content: `
-      <div class="user-marker" id="userMarker"></div>
-    `,
+    content: `<div class="user-marker" id="userMarker"></div>`,
     yAnchor: 0.5
   });
 
@@ -66,17 +64,14 @@
 
     (position) => {
 
-      const lat = position.coords.latitude;
-      const lon = position.coords.longitude;
+      currentPosition = new kakao.maps.LatLng(
+        position.coords.latitude,
+        position.coords.longitude
+      );
 
-      currentPosition = new kakao.maps.LatLng(lat, lon);
-
-      // 마커 위치 이동
       overlay.setPosition(currentPosition);
 
-      // 지도 중심 이동
       map.setCenter(currentPosition);
-
     },
 
     (error) => {
@@ -92,6 +87,14 @@
   );
 
   // 방향 센서
+  function handleOrientation(event) {
+
+    if (event.alpha == null) return;
+
+    // 회전 보정값
+    targetHeading = event.alpha + 90;
+  }
+
   window.addEventListener(
     "deviceorientationabsolute",
     handleOrientation,
@@ -104,29 +107,32 @@
     true
   );
 
-  function handleOrientation(event) {
+  // 부드러운 회전
+  function animateRotation() {
 
-    if (event.alpha == null) return;
+    const marker =
+      document.getElementById("userMarker");
 
-    /*
-      회전 보정값
-      ↑ 이미지 기준에 따라 조절
-    */
+    if (marker) {
 
-    heading = event.alpha + 180;
+      let diff =
+        targetHeading - currentHeading;
 
-    updateRotation();
+      // 최단 회전 방향
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+
+      // 회전 부드럽게
+      currentHeading += diff * 0.08;
+
+      marker.style.transform =
+        `rotate(${currentHeading}deg)`;
+    }
+
+    requestAnimationFrame(animateRotation);
   }
 
-  function updateRotation() {
-
-    const marker = document.getElementById("userMarker");
-
-    if (!marker) return;
-
-    marker.style.transform =
-      `rotate(${heading}deg)`;
-  }
+  animateRotation();
 
 </script>
 
