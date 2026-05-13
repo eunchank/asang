@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>현재 위치 지도</title>
+  <title>보행자 지도</title>
 
   <style>
     body {
@@ -16,7 +16,6 @@
       height: 100vh;
     }
 
-    /* 위치 아이콘 */
     .user-marker {
       width: 60px;
       height: 60px;
@@ -38,84 +37,95 @@
 
 <script>
 
-  const mapContainer = document.getElementById('map');
+  const map = new kakao.maps.Map(
+    document.getElementById('map'),
+    {
+      center: new kakao.maps.LatLng(37.5665, 126.9780),
+      level: 2
+    }
+  );
 
-  const map = new kakao.maps.Map(mapContainer, {
-    center: new kakao.maps.LatLng(37.5665, 126.9780),
-    level: 2
-  });
-
-  let overlay = null;
   let heading = 0;
 
-  // 방향 센서
-  window.addEventListener("deviceorientationabsolute", handleOrientation, true);
-  window.addEventListener("deviceorientation", handleOrientation, true);
+  // 현재 위치
+  let currentPosition = new kakao.maps.LatLng(37.5665, 126.9780);
 
-  function handleOrientation(event) {
+  // 마커 한번만 생성
+  const overlay = new kakao.maps.CustomOverlay({
+    position: currentPosition,
+    content: `
+      <div class="user-marker" id="userMarker"></div>
+    `,
+    yAnchor: 0.5
+  });
 
-    if (event.alpha != null) {
+  overlay.setMap(map);
 
-      heading = 360 - event.alpha;
-
-      updateRotation();
-    }
-  }
-
-  // 위치 계속 추적
+  // 위치 추적
   navigator.geolocation.watchPosition(
 
-    function(position) {
+    (position) => {
 
       const lat = position.coords.latitude;
       const lon = position.coords.longitude;
 
-      const currentPosition = new kakao.maps.LatLng(lat, lon);
+      currentPosition = new kakao.maps.LatLng(lat, lon);
+
+      // 마커 위치 이동
+      overlay.setPosition(currentPosition);
 
       // 지도 중심 이동
       map.setCenter(currentPosition);
 
-      // 기존 마커 제거
-      if (overlay) {
-        overlay.setMap(null);
-      }
-
-      // 커스텀 마커 생성
-      overlay = new kakao.maps.CustomOverlay({
-        position: currentPosition,
-        content: `
-          <div class="user-marker" id="userMarker"></div>
-        `,
-        yAnchor: 1
-      });
-
-      overlay.setMap(map);
-
-      updateRotation();
-
     },
 
-    function(error) {
+    (error) => {
       console.error(error);
-      alert("위치 정보를 가져올 수 없습니다.");
     },
 
     {
       enableHighAccuracy: true,
       maximumAge: 0,
-      timeout: 5000
+      timeout: 10000
     }
 
   );
 
-  // 방향 회전
+  // 방향 센서
+  window.addEventListener(
+    "deviceorientationabsolute",
+    handleOrientation,
+    true
+  );
+
+  window.addEventListener(
+    "deviceorientation",
+    handleOrientation,
+    true
+  );
+
+  function handleOrientation(event) {
+
+    if (event.alpha == null) return;
+
+    /*
+      회전 보정값
+      ↑ 이미지 기준에 따라 조절
+    */
+
+    heading = event.alpha + 180;
+
+    updateRotation();
+  }
+
   function updateRotation() {
 
     const marker = document.getElementById("userMarker");
 
-    if (marker) {
-      marker.style.transform = `rotate(${heading}deg)`;
-    }
+    if (!marker) return;
+
+    marker.style.transform =
+      `rotate(${heading}deg)`;
   }
 
 </script>
