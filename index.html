@@ -2,24 +2,27 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>아주대 커뮤니티 맵핑</title>
+    <title>네비게이션 최종 수정판</title>
     <style>
-        /* CSS는 이전과 동일하게 유지 */
         html, body { margin: 0; padding: 0; width: 100%; height: 100vh; height: 100dvh; overflow: hidden; }
         #map { width: 100%; height: 100%; }
-        #center-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; width: 75px; height: 75px; pointer-events: none; }
+        #center-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; width: 75px; height: 75px; pointer-events: none; display: block; }
+
         .map-btn { position: absolute; z-index: 10; background: #fff; border: 1px solid #ccc; border-radius: 50%; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; outline: none; }
         .location-btn { bottom: 40px; left: 40px; width: 150px; height: 150px; font-size: 100px; }
         .add-marker-btn { bottom: 40px; right: 40px; width: 150px; height: 150px; background: #fae100; font-size: 100px; font-weight: bold; }
+
         .custom-modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; width: 90%; max-width: 800px; background: white; padding: 40px; border-radius: 30px; box-shadow: 0 0 50px rgba(0,0,0,0.6); box-sizing: border-box; }
         .custom-modal h2 { margin-top: 0; font-size: 48px; margin-bottom: 20px; }
         .custom-modal select, .custom-modal textarea, .custom-modal input { width: 100%; margin-bottom: 25px; padding: 20px; border: 2px solid #ddd; border-radius: 15px; font-size: 32px; box-sizing: border-box; }
+
         .overlay-wrap { position: absolute; bottom: 40px; left: -250px; width: 500px; pointer-events: auto; }
         .overlay-content { position: relative; background: white; border-radius: 30px; border: 2px solid #eee; box-shadow: 0 10px 40px rgba(0,0,0,0.4); padding: 30px; text-align: center; }
         .overlay-content:after { content: ''; position: absolute; border-top: 25px solid white; border-left: 20px solid transparent; border-right: 20px solid transparent; bottom: -24px; left: 50%; transform: translateX(-50%); }
         .v-category { font-size: 24px; color: #888; display: block; margin-bottom: 10px; }
         .v-content { font-size: 34px; line-height: 1.4; margin-bottom: 20px; word-break: break-all; font-weight: bold; color: #333; }
         .v-img { width: 100%; max-height: 400px; object-fit: cover; border-radius: 20px; margin-top: 10px; }
+
         .modal-footer { display: flex; gap: 20px; margin-top: 25px; }
         .modal-footer button { flex: 1; padding: 25px; border: none; border-radius: 15px; font-size: 32px; font-weight: bold; cursor: pointer; }
         .btn-cancel { background: #eee; color: #333; }
@@ -31,11 +34,12 @@
 
 <div id="map"></div>
 <img src="icon/cross.png" id="center-icon">
-<button class="map-btn location-btn" onclick="getCurrentLocation()">🎯</button>
+
+<button class="map-btn location-btn" onclick="startNavigation()">🎯</button>
 <button class="map-btn add-marker-btn" onclick="openModal('write-modal')">+</button>
 
 <div id="write-modal" class="custom-modal">
-    <h2>📍 핀 찍기</h2>
+    <h2>📍 장소 공유하기</h2>
     <select id="m-category"></select>
     <textarea id="m-content" rows="5" placeholder="내용을 입력하세요."></textarea>
     <input type="file" id="m-photo" accept="image/*">
@@ -64,13 +68,17 @@
     const storage = getStorage(app);
 
     const mapContainer = document.getElementById('map');
-    const mapOption = { center: new kakao.maps.LatLng(37.2830, 127.0466), level: 2 };
+    const mapOption = { center: new kakao.maps.LatLng(37.566826, 126.9786567), level: 3 };
     const map = new kakao.maps.Map(mapContainer, mapOption);
     
     let markersMap = {};
     let currentOverlay = null;
-    let currentOverlayId = null; // 어떤 마커의 오버레이가 열려있는지 추적
+    let currentOverlayId = null;
     let categoryData = {};
+
+    let myLocationMarker = null;
+    let isTracking = false;
+    let watchId = null; // 중복 실행 방지
 
     async function loadCategories() {
         try {
@@ -93,55 +101,33 @@
             snapshot.docChanges().forEach((change) => {
                 const data = change.doc.data();
                 const id = change.doc.id;
-
                 if (change.type === "added") {
                     const targetImg = categoryData[data.category] || 'icon/pin_default.png';
-                    
-                    // --- [비율 수정 포인트] ---
-                    // 찌그러진다면 가로(54), 세로(64) 식으로 비율을 미세하게 조정하세요.
-                    const mSize = new kakao.maps.Size(90, 120); 
-                    const mOffset = new kakao.maps.Point(44, 120); // 가로의 절반, 세로 끝
-                    
+                    const mSize = new kakao.maps.Size(54, 64);
+                    const mOffset = new kakao.maps.Point(27, 64);
                     const iconImg = new kakao.maps.MarkerImage(targetImg, mSize, { offset: mOffset });
-
                     const marker = new kakao.maps.Marker({
-                        map: map,
-                        position: new kakao.maps.LatLng(data.lat, data.lng),
-                        image: iconImg
+                        map: map, position: new kakao.maps.LatLng(data.lat, data.lng), image: iconImg
                     });
-
-                    // 이미지 로드 체크 (이전 로직 유지)
                     const imgChecker = new Image();
                     imgChecker.src = targetImg;
                     imgChecker.onerror = () => {
-                        const defaultIcon = new kakao.maps.MarkerImage('icon/pin_default.png', mSize, { offset: mOffset });
-                        marker.setImage(defaultIcon);
+                        marker.setImage(new kakao.maps.MarkerImage('icon/pin_default.png', mSize, { offset: mOffset }));
                     };
-
                     kakao.maps.event.addListener(marker, 'click', () => showOverlay(id, data, marker.getPosition()));
                     markersMap[id] = marker;
                 } 
                 else if (change.type === "removed") {
-                    // --- [삭제 버그 수정 포인트] ---
-                    if (markersMap[id]) {
-                        markersMap[id].setMap(null);
-                        delete markersMap[id];
-                    }
-                    // 현재 열려있는 오버레이가 삭제된 데이터라면 같이 제거
-                    if (currentOverlayId === id) {
-                        currentOverlay.setMap(null);
-                        currentOverlay = null;
-                        currentOverlayId = null;
-                    }
+                    if (markersMap[id]) { markersMap[id].setMap(null); delete markersMap[id]; }
+                    if (currentOverlayId === id) { closeOverlay(); }
                 }
             });
         });
     }
 
     function showOverlay(id, data, position) {
-        if (currentOverlay) currentOverlay.setMap(null);
-        currentOverlayId = id; // 현재 열린 오버레이 ID 저장
-
+        if (currentOverlay) closeOverlay();
+        currentOverlayId = id;
         const content = document.createElement('div');
         content.className = 'overlay-wrap';
         content.addEventListener('click', e => e.stopPropagation());
@@ -156,27 +142,68 @@
                 </div>
             </div>
         `;
-        
-        content.querySelector('#ov-close').onclick = () => { 
-            currentOverlay.setMap(null); 
-            currentOverlay = null; 
-            currentOverlayId = null;
-        };
-
+        content.querySelector('#ov-close').onclick = closeOverlay;
         content.querySelector('#ov-delete').onclick = async () => {
             if (!confirm("정말 삭제하시겠습니까?")) return;
             try {
                 if (data.imageUrl) await deleteObject(ref(storage, data.imageUrl)).catch(()=>{});
                 await deleteDoc(doc(db, "markers", id));
-                // 삭제 성공 시 onSnapshot에서 자동으로 UI가 지워집니다.
-            } catch (err) { alert("삭제 실패"); }
+            } catch (err) { alert("오류"); }
         };
-
         currentOverlay = new kakao.maps.CustomOverlay({ content, position, yAnchor: 1.2, zIndex: 300, clickable: true });
         currentOverlay.setMap(map);
     }
 
-    // --- 이하 업로드 및 위치 관련 함수 동일 ---
+    function closeOverlay() {
+        if (currentOverlay) currentOverlay.setMap(null);
+        currentOverlay = null; currentOverlayId = null;
+    }
+
+    // --- 내비게이션 방향 로직 ---
+    window.addEventListener('deviceorientationabsolute', (e) => {
+        let heading = e.webkitCompassHeading || (360 - e.alpha);
+        if (myLocationMarker) {
+            const el = document.querySelector(`img[src*="my_location.png"]`);
+            if (el) el.style.transform = `rotate(${heading}deg)`;
+        }
+    }, true);
+
+    window.startNavigation = function() {
+        if (!navigator.geolocation) return alert("GPS 미지원");
+        
+        isTracking = true;
+        document.getElementById('center-icon').style.display = 'none'; // 조준점 숨김
+
+        // 이미 위치가 있으면 해당 위치로 바로 이동
+        if (myLocationMarker) {
+            map.setCenter(myLocationMarker.getPosition());
+            map.setLevel(1);
+        }
+
+        if (watchId === null) {
+            watchId = navigator.geolocation.watchPosition((pos) => {
+                const newPos = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+                if (!myLocationMarker) {
+                    myLocationMarker = new kakao.maps.Marker({
+                        position: newPos,
+                        image: new kakao.maps.MarkerImage('icon/loc_icon.png', new kakao.maps.Size(60,60), {offset: new kakao.maps.Point(30,30)}),
+                        zIndex: 999, map: map
+                    });
+                } else {
+                    myLocationMarker.setPosition(newPos);
+                }
+                if (isTracking) map.setCenter(newPos);
+            }, null, { enableHighAccuracy: true });
+        }
+    };
+
+    kakao.maps.event.addListener(map, 'dragstart', () => {
+        isTracking = false;
+        document.getElementById('center-icon').style.display = 'block'; // 조준점 표시
+    });
+
+    kakao.maps.event.addListener(map, 'click', closeOverlay);
+
     window.uploadData = async function() {
         const cat = document.getElementById('m-category').value;
         const txt = document.getElementById('m-content').value;
@@ -195,43 +222,19 @@
                 imageUrl: url, timestamp: new Date()
             });
             closeModal('write-modal');
-        } catch (e) { alert("업로드 실패"); }
+        } catch (e) { alert("실패"); }
     };
-
-    window.getCurrentLocation = function() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(p => {
-                const loc = new kakao.maps.LatLng(p.coords.latitude, p.coords.longitude);
-                map.setCenter(loc); map.setLevel(1);
-                document.getElementById('center-icon').style.display = 'none';
-            });
-        }
-    };
-
-    kakao.maps.event.addListener(map, 'click', () => { 
-        if (currentOverlay) { 
-            currentOverlay.setMap(null); 
-            currentOverlay = null; 
-            currentOverlayId = null;
-        } 
-    });
-
-    kakao.maps.event.addListener(map, 'dragstart', () => {
-        document.getElementById('center-icon').style.display = 'block';
-    });
 
     window.openModal = (id) => { document.getElementById(id).style.display = 'block'; };
     window.closeModal = (id) => { 
-    document.getElementById(id).style.display = 'none';
-    
-    // 모달이 닫힐 때 입력 내용들을 싹 비워줍니다.
-    if (id === 'write-modal') {
-        document.getElementById('m-content').value = "";
-        document.getElementById('m-photo').value = "";
-        document.getElementById('m-category').selectedIndex = 0;
-    }
-};
-    
+        document.getElementById(id).style.display = 'none'; 
+        if (id === 'write-modal') {
+            document.getElementById('m-content').value = "";
+            document.getElementById('m-photo').value = "";
+            document.getElementById('m-category').selectedIndex = 0;
+        }
+    };
+
     loadCategories();
 </script>
 
