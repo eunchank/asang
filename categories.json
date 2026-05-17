@@ -1,0 +1,18 @@
+{
+    "pins":[
+
+        {
+        "category":"빙판",
+        "img":"icon/ice.png"
+        },
+        {
+        "category":"카페",
+        "img":"icon/caf.png"
+        },
+        {
+        "category":"고양이",
+        "img":"icon/cat.png"
+        }
+
+    ]
+}
