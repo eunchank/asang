@@ -35,7 +35,7 @@
 <button class="map-btn add-marker-btn" onclick="openModal('write-modal')">+</button>
 
 <div id="write-modal" class="custom-modal">
-    <h2>📍 핀 찍기</h2>
+    <h2>📍 장소 공유하기</h2>
     <select id="m-category"></select>
     <textarea id="m-content" rows="5" placeholder="내용을 입력하세요."></textarea>
     <input type="file" id="m-photo" accept="image/*">
@@ -64,7 +64,7 @@
     const storage = getStorage(app);
 
     const mapContainer = document.getElementById('map');
-    const mapOption = { center: new kakao.maps.LatLng(37.2830, 127.0466), level: 2 };
+    const mapOption = { center: new kakao.maps.LatLng(37.283, 127.0446), level: 3 };
     const map = new kakao.maps.Map(mapContainer, mapOption);
     
     let markersMap = {};
