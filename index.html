@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <title>아주대 커뮤니티 맵핑</title>
     <style>
-        /* CSS는 이전과 동일하게 유지 */
         html, body { margin: 0; padding: 0; width: 100%; height: 100vh; height: 100dvh; overflow: hidden; }
         #map { width: 100%; height: 100%; }
         #center-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; width: 75px; height: 75px; pointer-events: none; }
@@ -69,7 +68,7 @@
     
     let markersMap = {};
     let currentOverlay = null;
-    let currentOverlayId = null; // 어떤 마커의 오버레이가 열려있는지 추적
+    let currentOverlayId = null;
     let categoryData = {};
 
     async function loadCategories() {
@@ -97,10 +96,8 @@
                 if (change.type === "added") {
                     const targetImg = categoryData[data.category] || 'icon/pin_default.png';
                     
-                    // --- [비율 수정 포인트] ---
-                    // 찌그러진다면 가로(54), 세로(64) 식으로 비율을 미세하게 조정하세요.
                     const mSize = new kakao.maps.Size(90, 120); 
-                    const mOffset = new kakao.maps.Point(44, 120); // 가로의 절반, 세로 끝
+                    const mOffset = new kakao.maps.Point(44, 120);
                     
                     const iconImg = new kakao.maps.MarkerImage(targetImg, mSize, { offset: mOffset });
 
@@ -110,7 +107,6 @@
                         image: iconImg
                     });
 
-                    // 이미지 로드 체크 (이전 로직 유지)
                     const imgChecker = new Image();
                     imgChecker.src = targetImg;
                     imgChecker.onerror = () => {
@@ -122,12 +118,10 @@
                     markersMap[id] = marker;
                 } 
                 else if (change.type === "removed") {
-                    // --- [삭제 버그 수정 포인트] ---
                     if (markersMap[id]) {
                         markersMap[id].setMap(null);
                         delete markersMap[id];
                     }
-                    // 현재 열려있는 오버레이가 삭제된 데이터라면 같이 제거
                     if (currentOverlayId === id) {
                         currentOverlay.setMap(null);
                         currentOverlay = null;
@@ -140,7 +134,7 @@
 
     function showOverlay(id, data, position) {
         if (currentOverlay) currentOverlay.setMap(null);
-        currentOverlayId = id; // 현재 열린 오버레이 ID 저장
+        currentOverlayId = id;
 
         const content = document.createElement('div');
         content.className = 'overlay-wrap';
@@ -168,7 +162,6 @@
             try {
                 if (data.imageUrl) await deleteObject(ref(storage, data.imageUrl)).catch(()=>{});
                 await deleteDoc(doc(db, "markers", id));
-                // 삭제 성공 시 onSnapshot에서 자동으로 UI가 지워집니다.
             } catch (err) { alert("삭제 실패"); }
         };
 
@@ -176,7 +169,6 @@
         currentOverlay.setMap(map);
     }
 
-    // --- 이하 업로드 및 위치 관련 함수 동일 ---
     window.uploadData = async function() {
         const cat = document.getElementById('m-category').value;
         const txt = document.getElementById('m-content').value;
@@ -222,15 +214,13 @@
 
     window.openModal = (id) => { document.getElementById(id).style.display = 'block'; };
     window.closeModal = (id) => { 
-    document.getElementById(id).style.display = 'none';
-    
-    // 모달이 닫힐 때 입력 내용들을 싹 비워줍니다.
-    if (id === 'write-modal') {
-        document.getElementById('m-content').value = "";
-        document.getElementById('m-photo').value = "";
-        document.getElementById('m-category').selectedIndex = 0;
-    }
-};
+        document.getElementById(id).style.display = 'none';
+        if (id === 'write-modal') {
+            document.getElementById('m-content').value = "";
+            document.getElementById('m-photo').value = "";
+            document.getElementById('m-category').selectedIndex = 0;
+        }
+    };
     
     loadCategories();
 </script>
