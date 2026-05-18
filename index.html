@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>아주대 커뮤니티 맵핑1</title>
+    <title>아주대 커뮤니티 맵핑</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100vh; height: 100dvh; overflow: hidden; }
         #map { width: 100%; height: 100%; }
@@ -24,6 +24,49 @@
         .btn-cancel { background: #eee; color: #333; }
         .btn-action { background: #fae100; color: #000; }
         .btn-delete { background: #ff4d4d; color: white; }
+
+        /* [추가] 전체화면 로딩 오버레이 스타일 */
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: sans-serif;
+        }
+
+        /* [추가] 뱅글뱅글 도는 css 스피너 */
+        .spinner {
+            width: 90px;
+            height: 90px;
+            border: 10px solid rgba(255, 255, 255, 0.3);
+            border-top: 10px solid #fae100;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 30px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 36px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        
+        /* 버튼이 비활성화 되었을 때의 투명도 조절 */
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -39,9 +82,15 @@
     <textarea id="m-content" rows="5" placeholder="내용을 입력하세요."></textarea>
     <input type="file" id="m-photo" accept="image/*">
     <div class="modal-footer">
-        <button class="btn-cancel" onclick="closeModal('write-modal')">취소</button>
-        <button class="btn-action" onclick="uploadData()">공유하기</button>
+        <button class="btn-cancel" id="btn-modal-cancel" onclick="closeModal('write-modal')">취소</button>
+        <button class="btn-action" id="btn-modal-upload" onclick="uploadData()">공유하기</button>
     </div>
+</div>
+
+<!-- [추가] 로딩 화면 엘리먼트 -->
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">장소를 공유하는 중입니다...</div>
 </div>
 
 <script type="module">
@@ -95,10 +144,8 @@
 
                 if (change.type === "added") {
                     const targetImg = categoryData[data.category] || 'icon/pin_default.png';
-                    
                     const mSize = new kakao.maps.Size(90, 120); 
                     const mOffset = new kakao.maps.Point(44, 120);
-                    
                     const iconImg = new kakao.maps.MarkerImage(targetImg, mSize, { offset: mOffset });
 
                     const marker = new kakao.maps.Marker({
@@ -169,13 +216,27 @@
         currentOverlay.setMap(map);
     }
 
+    // [핵심 변경] 업로드 프로세스 진행 중 시각적 효과 부여
     window.uploadData = async function() {
         const cat = document.getElementById('m-category').value;
         const txt = document.getElementById('m-content').value;
         const file = document.getElementById('m-photo').files[0];
         const center = map.getCenter();
+        
         if (!txt) return alert("내용을 입력하세요.");
+
+        // UI 제어용 엘리먼트 가져오기
+        const upBtn = document.getElementById('btn-modal-upload');
+        const cancelBtn = document.getElementById('btn-modal-cancel');
+        const loader = document.getElementById('loading-overlay');
+
         try {
+            // 1. 로딩 시작 설정 (버튼 잠금 + 전체화면 딤 처리 및 스피너 가동)
+            upBtn.disabled = true;
+            cancelBtn.disabled = true;
+            upBtn.innerText = "공유 중...";
+            loader.style.display = "flex";
+
             let url = "";
             if (file) {
                 const sRef = ref(storage, `images/${Date.now()}_${file.name}`);
@@ -186,8 +247,17 @@
                 category: cat, content: txt, lat: center.getLat(), lng: center.getLng(),
                 imageUrl: url, timestamp: new Date()
             });
+            
             closeModal('write-modal');
-        } catch (e) { alert("업로드 실패"); }
+        } catch (e) { 
+            alert("업로드 실패"); 
+        } finally {
+            // 2. 무조건 로딩 해제 및 버튼 상태 복구
+            upBtn.disabled = false;
+            cancelBtn.disabled = false;
+            upBtn.innerText = "공유하기";
+            loader.style.display = "none";
+        }
     };
 
     window.getCurrentLocation = function() {
