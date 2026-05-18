@@ -2,12 +2,24 @@
     "pins":[
 
         {
-        "category":"빙판",
-        "img":"icon/ice.png"
+        "category":"침수",
+        "img":"icon/water.png"
         },
         {
         "category":"낙상주의",
         "img":"icon/fall.png"
+        },
+        {
+        "category":"공사중",
+        "img":"icon/con.png"
+        },
+        {
+        "category":"벌레 주의",
+        "img":"icon/insec.png"
+        },
+        {
+        "category":"야생동물 주의",
+        "img":"icon/wild.png"
         }
 
     ]
