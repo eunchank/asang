@@ -20,6 +20,10 @@
         {
         "category":"야생동물 주의",
         "img":"icon/wild.png"
+        },
+        {
+        "category":"비상 전화",
+        "img":"icon/cell.png"
         }
 
     ]
