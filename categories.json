@@ -4,6 +4,10 @@
         {
         "category":"빙판",
         "img":"icon/ice.png"
+        },
+        {
+        "category":"낙상주의",
+        "img":"icon/fall.png"
         }
 
     ]
