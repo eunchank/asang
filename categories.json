@@ -14,16 +14,24 @@
         "img":"icon/con.png"
         },
         {
-        "category":"벌레 주의",
-        "img":"icon/insec.png"
-        },
-        {
-        "category":"야생동물 주의",
+        "category":"벌레/동물 주의",
         "img":"icon/wild.png"
         },
         {
         "category":"비상 전화",
         "img":"icon/cell.png"
+        },
+        {
+        "category":"가로등 고장",
+        "img":"icon/light.png"
+        },
+        {
+        "category":"차 사고 주의",
+        "img":"icon/crash.png"
+        },
+        {
+        "category":"범죄 주의",
+        "img":"icon/crim.png"
         }
 
     ]
