@@ -100,19 +100,33 @@
     let categoryData = {};
 
     async function loadCategories() {
-        try {
-            const response = await fetch('categories.json');
-            const data = await response.json();
-            const selectEl = document.getElementById('m-category');
-            data.pins.forEach(pin => {
-                categoryData[pin.category] = pin.img;
-                const opt = document.createElement('option');
-                opt.value = pin.category; opt.innerText = pin.category;
-                selectEl.appendChild(opt);
-            });
-            initRealtimeSync();
-        } catch (e) { initRealtimeSync(); }
+async function loadCategories() {
+    try {
+        // [수정] 파일명 뒤에 유니크한 타임스탬프를 붙여 브라우저 캐시를 강제로 무력화합니다.
+        const cacheBuster = Date.now();
+        const response = await fetch(`categories.json?v=${cacheBuster}`);
+        
+        const data = await response.json();
+        const selectEl = document.getElementById('m-category');
+        
+        // 기존 셀렉트 박스 아이템 초기화 (중복 쌓임 방지)
+        selectEl.innerHTML = ""; 
+        categoryData = {}; 
+
+        data.pins.forEach(pin => {
+            categoryData[pin.category] = pin.img;
+            const opt = document.createElement('option');
+            opt.value = pin.category; 
+            opt.innerText = pin.category;
+            selectEl.appendChild(opt);
+        });
+        initRealtimeSync();
+    } catch (e) { 
+        console.error("카테고리 로드 실패:", e);
+        initRealtimeSync(); 
     }
+}
+
 
     function initRealtimeSync() {
         const q = query(collection(db, "markers"), orderBy("timestamp", "desc"));
