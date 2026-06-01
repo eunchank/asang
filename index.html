@@ -301,7 +301,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
-// [수정] index2의 실제 작동하는 Firebase Config 데이터로 교체 완료
 const firebaseConfig = {
     apiKey: "AIzaSyAfFeWiJVpDHjlITSA3NvVJFl6c96JlskQ",
     authDomain: "sixsen-39531.firebaseapp.com",
@@ -333,10 +332,15 @@ let clusterCircles = [];
 let currentViewMode = "pin";
 let routeLine = null;
 
+let userCurrentLat = null;
+let userCurrentLng = null;
+
+// [개선] 밀집도(핀 개수)에 따른 세분화된 색상 변경 시스템
 function getDangerColor(count) {
-    if (count <= 2) return 'rgba(255,230,0,0.4)';
-    if (count <= 5) return 'rgba(255,140,0,0.5)';
-    return 'rgba(255,0,0,0.6)';
+    if (count === 1) return '#FFEB3B'; // 1개: 밝은 노랑
+    if (count === 2) return '#FFA726'; // 2개: 주황
+    if (count === 3) return '#FB8C00'; // 3개: 짙은 주황
+    return '#E53935';                  // 4개 이상: 강력한 빨강
 }
 
 function clearClusters() {
@@ -344,31 +348,59 @@ function clearClusters() {
     clusterCircles = [];
 }
 
+// [개선] 두 좌표 간의 실제 거리(m)를 계산하는 하버사인(Haversine) 함수
+function getDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371000; // 지구 반지름 (미터 단위)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+// [개선] 거리 기반 핀 병합(클러스터링) 알고리즘
 function createDangerClusters() {
     clearClusters();
-    const grouped = {};
+    const clusters = [];
+    const MERGE_DISTANCE = 40; // 40미터 이내의 핀들은 하나로 그룹화합니다.
 
     Object.values(markersMap).forEach(marker => {
         const pos = marker.getPosition();
-        const key = pos.getLat().toFixed(3) + "_" + pos.getLng().toFixed(3);
+        const mLat = pos.getLat();
+        const mLng = pos.getLng();
 
-        if (!grouped[key]) {
-            grouped[key] = {
-                lat: pos.getLat(),
-                lng: pos.getLng(),
-                count: 0
-            };
+        let joined = false;
+        // 기존 생성된 그룹 중 가까운 곳이 있는지 탐색
+        for (let i = 0; i < clusters.length; i++) {
+            const dist = getDistance(mLat, mLng, clusters[i].lat, clusters[i].lng);
+            if (dist <= MERGE_DISTANCE) {
+                clusters[i].count++;
+                joined = true;
+                break;
+            }
         }
-        grouped[key].count++;
+
+        // 주변에 합쳐질 그룹이 없다면 독자적인 새 위험 zone 생성
+        if (!joined) {
+            clusters.push({
+                lat: mLat,
+                lng: mLng,
+                count: 1
+            });
+        }
     });
 
-    Object.values(grouped).forEach(g => {
+    // 계산된 그룹 정보를 바탕으로 카카오맵에 위험 원 그리기
+    clusters.forEach(g => {
         const circle = new kakao.maps.Circle({
             center: new kakao.maps.LatLng(g.lat, g.lng),
-            radius: 50 + (g.count * 20),
+            // [개선] 핀 1개일 때의 과도한 범위를 대폭 축소 (기본 20m + 핀 추가 시마다 10m씩 확대)
+            radius: 20 + (g.count * 10),
             strokeWeight: 0,
             fillColor: getDangerColor(g.count),
-            fillOpacity: 0.7
+            fillOpacity: 0.55
         });
 
         circle.setMap(map);
@@ -376,15 +408,12 @@ function createDangerClusters() {
     });
 }
 
-window.getCurrentLocation = function() {
+function startLocationTracking() {
     if (navigator.geolocation) {
         navigator.geolocation.watchPosition(p => {
-            const lat = p.coords.latitude;
-            const lng = p.coords.longitude;
-            const loc = new kakao.maps.LatLng(lat, lng);
-
-            map.setCenter(loc);
-            map.setLevel(1);
+            userCurrentLat = p.coords.latitude;
+            userCurrentLng = p.coords.longitude;
+            const loc = new kakao.maps.LatLng(userCurrentLat, userCurrentLng);
 
             if (myLocationMarker) myLocationMarker.setMap(null);
             if (myLocationCircle) myLocationCircle.setMap(null);
@@ -408,9 +437,22 @@ window.getCurrentLocation = function() {
 
             myLocationCircle.setMap(map);
             myLocationMarker.setMap(map);
-
-            document.getElementById('center-icon').style.display = 'none';
+        }, (err) => {
+            console.warn("위치 정보를 가져올 수 없습니다.", err);
+        }, {
+            enableHighAccuracy: true
         });
+    }
+}
+
+window.getCurrentLocation = function() {
+    if (userCurrentLat && userCurrentLng) {
+        const loc = new kakao.maps.LatLng(userCurrentLat, userCurrentLng);
+        map.setCenter(loc);
+        map.setLevel(1);
+        document.getElementById('center-icon').style.display = 'none';
+    } else {
+        alert("아직 위치 정보를 가져오는 중입니다. 잠시만 기다려주세요.");
     }
 };
 
@@ -432,12 +474,9 @@ async function loadCategories() {
             selectEl.appendChild(opt);
         });
 
-        // [중요 수정] 카테고리 로딩이 성공적으로 완료된 후에만 Firebase 동기화를 시작합니다.
         initRealtimeSync();
-
     } catch(e) {
         console.error(e);
-        // [중요 수정] 카테고리 로딩에 실패하더라도 일단 Firebase 동기화는 시작합니다. (기본 핀이라도 띄우기 위해)
         initRealtimeSync();
     }
 }
@@ -666,31 +705,32 @@ function drawSafePath(path) {
 }
 
 document.getElementById('safe-route-btn').onclick = () => {
-    if (!navigator.geolocation) return;
+    if (!userCurrentLat || !userCurrentLng) {
+        alert("현재 위치를 파악할 수 없습니다.");
+        return;
+    }
 
-    navigator.geolocation.getCurrentPosition(p => {
-        const start = {
-            lat: p.coords.latitude,
-            lng: p.coords.longitude
-        };
+    const start = {
+        lat: userCurrentLat,
+        lng: userCurrentLng
+    };
 
-        const center = map.getCenter();
-        const end = {
-            lat: center.getLat(),
-            lng: center.getLng()
-        };
+    const center = map.getCenter();
+    const end = {
+        lat: center.getLat(),
+        lng: center.getLng()
+    };
 
-        const path = [
-            start,
-            {
-                lat: ((start.lat + end.lat) / 2) + ((Math.random() - 0.5) * 0.001),
-                lng: ((start.lng + end.lng) / 2) + ((Math.random() - 0.5) * 0.001)
-            },
-            end
-        ];
+    const path = [
+        start,
+        {
+            lat: ((start.lat + end.lat) / 2) + ((Math.random() - 0.5) * 0.001),
+            lng: ((start.lng + end.lng) / 2) + ((Math.random() - 0.5) * 0.001)
+        },
+        end
+    ];
 
-        drawSafePath(path);
-    });
+    drawSafePath(path);
 };
 
 document.getElementById('view-toggle-btn').onclick = () => {
@@ -735,6 +775,7 @@ kakao.maps.event.addListener(map, 'dragstart', () => {
     document.getElementById('center-icon').style.display = 'block';
 });
 
+startLocationTracking();
 loadCategories();
 </script>
 
